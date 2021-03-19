@@ -37,12 +37,13 @@ def main():
                                                shuffle=True, num_workers=4, pin_memory=True)
 
     # Create a simple model
-    model = Net(len(CLASS_NAMES), im_height, im_width)
+    model = Net(len(CLASS_NAMES), im_height, im_width).cuda()
     optim = torch.optim.Adam(model.parameters())
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.CrossEntropyLoss().cuda()
     for i in range(num_epochs):
         train_total, train_correct = 0,0
         for idx, (inputs, targets) in enumerate(train_loader):
+            targets = targets.cuda()
             optim.zero_grad()
             outputs = model(inputs)
             loss = criterion(outputs, targets)
@@ -59,4 +60,5 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    print(torch.cuda.is_available())
+    # main()

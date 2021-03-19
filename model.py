@@ -10,9 +10,10 @@ class Net(nn.Module):
         super(Net, self).__init__()
         self.layer1 = nn.Linear(im_height * im_width * 3, 128)
         self.layer2 = nn.Linear(128, num_classes)
+        self.relu = nn.ReLU(inplace=True)
 
     def forward(self, x):
         x = x.flatten(1)
-        x = F.relu(self.layer1(x))
+        self.relu(self.layer1(x))
         x = self.layer2(x)
         return x
