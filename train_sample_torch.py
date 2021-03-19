@@ -43,6 +43,7 @@ def main():
     for i in range(num_epochs):
         train_total, train_correct = 0,0
         for idx, (inputs, targets) in enumerate(train_loader):
+            inputs = inputs.cuda()
             targets = targets.cuda()
             optim.zero_grad()
             outputs = model(inputs)
