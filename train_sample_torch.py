@@ -5,6 +5,7 @@ portions of the code. We provide this model in order to test the full pipeline,
 and to validate your own code submission.
 """
 
+import argparse
 import pathlib
 import numpy as np
 import torch
@@ -15,7 +16,7 @@ from model import Net
 from torch import nn
 
 
-def main():
+def main(args):
     # Create a pytorch dataset
     data_dir = pathlib.Path('./data/tiny-imagenet-200')
     image_count = len(list(data_dir.glob('**/*.JPEG')))
@@ -23,10 +24,10 @@ def main():
     print('Discovered {} images'.format(image_count))
 
     # Create the training data generator
-    batch_size = 32
-    im_height = 64
-    im_width = 64
-    num_epochs = 1
+    batch_size = args.B
+    im_height = args.H
+    im_width = args.W
+    num_epochs = args.E
 
     data_transforms = transforms.Compose([
         transforms.ToTensor(),
@@ -62,4 +63,10 @@ def main():
 
 if __name__ == '__main__':
     print("Using GPU:", torch.cuda.is_available())
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-B", help="batch size", default=32, type=int)
+    parser.add_argument("-H", help="image height", default=64, type=int)
+    parser.add_argument("-W", help="image width", default=64, type=int)
+    parser.add_argument("-E", help="num epochs", default=1, type=int)
+    args = parser.parse_args()
+    main(args)
