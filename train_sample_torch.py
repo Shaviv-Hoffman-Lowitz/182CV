@@ -13,9 +13,7 @@ import torch
 import torchvision
 import torchvision.transforms as transforms
 import time
-
-from model import Net
-from torchvision import models
+import drn as models
 from torch import nn
 
 
@@ -46,13 +44,11 @@ def main(args):
                                                shuffle=True, num_workers=4, pin_memory=True)
 
     # Creating a model
-    model = models.resnext101_32x8d(pretrained=True)
+    model = models.drn_d_105(pretrained=True)
 
     # Other models that I experimented with
     #model = models.alexnet(pretrained=True).cuda()
     #model = models.resnet101(pretrained=True).cuda()
-
-    # model.eval()
 
     # Freezing the weights from the pretrained model
     for param in model.parameters():
@@ -67,7 +63,9 @@ def main(args):
     model.to(device)
 
     # We should experiment with other optimizers as well
-    optim = torch.optim.Adam(model.parameters())
+    # optim = torch.optim.Adam(model.parameters())
+    optimizer = torch.optim.SGD(
+        model.parameters(), args.lr, momentum=args.m, weight_decay=args.wd)
 
     criterion = nn.CrossEntropyLoss().to(device)
     for i in range(num_epochs):
