@@ -116,15 +116,19 @@ if __name__ == '__main__':
     else:
         dev = "cpu"
     device = torch.device(dev)
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-B", help="batch size", default=32, type=int)
-    parser.add_argument("-H", help="image height", default=64, type=int)
-    parser.add_argument("-W", help="image width", default=64, type=int)
-    parser.add_argument("-E", help="num epochs", default=10, type=int)
-    parser.add_argument("-lr", help="learning rate", default=0.1, type=float)
-    parser.add_argument("-m", help='momentum', default=0.9, type=float)
-    parser.add_argument("-wd", help="weight decay", default=1e-4, type=float)
-    parser.add_argument(
-        "-freq", help="print frequency, in batches", default=10, type=int)
-    args = parser.parse_args()
-    main(args)
+<< << << < HEAD
+== == == =
+
+>>>>>> > fbdf95e(fixed cuda)
+parser = argparse.ArgumentParser()
+parser.add_argument("-B", help="batch size", default=32, type=int)
+parser.add_argument("-H", help="image height", default=64, type=int)
+parser.add_argument("-W", help="image width", default=64, type=int)
+parser.add_argument("-E", help="num epochs", default=10, type=int)
+parser.add_argument("-lr", help="learning rate", default=0.1, type=float)
+parser.add_argument("-m", help='momentum', default=0.9, type=float)
+parser.add_argument("-wd", help="weight decay", default=1e-4, type=float)
+parser.add_argument(
+    "-freq", help="print frequency, in batches", default=10, type=int)
+args = parser.parse_args()
+main(args)
