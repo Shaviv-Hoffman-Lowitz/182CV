@@ -33,6 +33,8 @@ def main(args):
 
     data_transforms = transforms.Compose([
         transforms.Resize((im_height, im_width)),
+        # transforms.Scale(256),
+        # transforms.CenterCrop(224),
         transforms.ToTensor(),
         # these are the standard norm vectors used for imagenet
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[
@@ -64,7 +66,7 @@ def main(args):
 
     # We should experiment with other optimizers as well
     # optim = torch.optim.Adam(model.parameters())
-    optimizer = torch.optim.SGD(
+    optim = torch.optim.SGD(
         model.parameters(), args.lr, momentum=args.m, weight_decay=args.wd)
 
     criterion = nn.CrossEntropyLoss().to(device)
