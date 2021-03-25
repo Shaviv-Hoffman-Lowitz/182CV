@@ -76,7 +76,7 @@ def main(args):
         train_total, train_correct = 0,0
         for idx, (inputs, targets) in enumerate(train_loader):
             # Sometimes it does not print training accuracies as the model is training, so uncomment the line below to see accuracies during training
-            #print("printing accuracies during training")
+            #print(" printing accuracies during training\n")
             if cuda_available:
                 inputs = inputs.cuda()
                 targets = targets.cuda()
