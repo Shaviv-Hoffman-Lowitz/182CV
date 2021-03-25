@@ -12,6 +12,7 @@ import torch
 import torchvision
 import torchvision.transforms as transforms
 from model import Net
+from torchvision import models
 
 from torch import nn
 
@@ -37,15 +38,46 @@ def main(args):
     train_loader = torch.utils.data.DataLoader(train_set, batch_size=batch_size,
                                                shuffle=True, num_workers=4, pin_memory=True)
 
+    cuda_available = torch.cuda.is_available()
     # Create a simple model
-    model = Net(len(CLASS_NAMES), im_height, im_width).cuda()
+    if cuda_available:
+        model = models.resnet50(pretrained=True).cuda()
+    else:
+        model = models.resnet50(pretrained=True)
+
+    # Other models that I experimented with 
+    #model = models.alexnet(pretrained=True).cuda()
+    #model = models.resnet101(pretrained=True).cuda()
+
+    #model.eval()
+
+    # Freezing the weights from the pretrained model
+    for param in model.parameters():
+      param.requires_grad = False
+
+    # Creating a final fully connected layer that will be trained in the training loop
+    number_of_features = model.fc.in_features
+    model.fc = nn.Linear(number_of_features, 200)
+
+    # Could alternatively have used len(CLASS_NAMES), instead of 200, like I did below
+    # model.fc = nn.Linear(number_of_features, len(CLASS_NAMES))
+
+    # We should experiment with other optimizers as well
     optim = torch.optim.Adam(model.parameters())
-    criterion = nn.CrossEntropyLoss().cuda()
+
+    if cuda_available:
+        criterion = nn.CrossEntropyLoss().cuda()
+    else:
+        criterion = nn.CrossEntropyLoss()
+
     for i in range(num_epochs):
         train_total, train_correct = 0,0
         for idx, (inputs, targets) in enumerate(train_loader):
-            inputs = inputs.cuda()
-            targets = targets.cuda()
+            # Sometimes it does not print training accuracies as the model is training, so uncomment the line below to see accuracies during training
+            # print("printing accuracies during training")
+            if cuda_available:
+                inputs = inputs.cuda()
+                targets = targets.cuda()
             optim.zero_grad()
             outputs = model(inputs)
             loss = criterion(outputs, targets)
@@ -67,6 +99,6 @@ if __name__ == '__main__':
     parser.add_argument("-B", help="batch size", default=32, type=int)
     parser.add_argument("-H", help="image height", default=64, type=int)
     parser.add_argument("-W", help="image width", default=64, type=int)
-    parser.add_argument("-E", help="num epochs", default=1, type=int)
+    parser.add_argument("-E", help="num epochs", default=100, type=int)
     args = parser.parse_args()
     main(args)
