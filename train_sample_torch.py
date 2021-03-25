@@ -11,9 +11,9 @@ import numpy as np
 import torch
 import torchvision
 import torchvision.transforms as transforms
+
 from model import Net
 from torchvision import models
-
 from torch import nn
 
 
@@ -38,8 +38,10 @@ def main(args):
     train_loader = torch.utils.data.DataLoader(train_set, batch_size=batch_size,
                                                shuffle=True, num_workers=4, pin_memory=True)
 
+    # Checking if cuda is available
     cuda_available = torch.cuda.is_available()
-    # Create a simple model
+
+    # Creating a model
     if cuda_available:
         model = models.resnet50(pretrained=True).cuda()
     else:
@@ -60,7 +62,7 @@ def main(args):
     model.fc = nn.Linear(number_of_features, 200)
 
     # Could alternatively have used len(CLASS_NAMES), instead of 200, like I did below
-    # model.fc = nn.Linear(number_of_features, len(CLASS_NAMES))
+    #model.fc = nn.Linear(number_of_features, len(CLASS_NAMES))
 
     # We should experiment with other optimizers as well
     optim = torch.optim.Adam(model.parameters())
@@ -74,7 +76,7 @@ def main(args):
         train_total, train_correct = 0,0
         for idx, (inputs, targets) in enumerate(train_loader):
             # Sometimes it does not print training accuracies as the model is training, so uncomment the line below to see accuracies during training
-            # print("printing accuracies during training")
+            #print("printing accuracies during training")
             if cuda_available:
                 inputs = inputs.cuda()
                 targets = targets.cuda()
