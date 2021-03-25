@@ -101,6 +101,6 @@ if __name__ == '__main__':
     parser.add_argument("-B", help="batch size", default=32, type=int)
     parser.add_argument("-H", help="image height", default=64, type=int)
     parser.add_argument("-W", help="image width", default=64, type=int)
-    parser.add_argument("-E", help="num epochs", default=100, type=int)
+    parser.add_argument("-E", help="num epochs", default=10, type=int)
     args = parser.parse_args()
     main(args)
