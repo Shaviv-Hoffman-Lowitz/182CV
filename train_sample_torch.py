@@ -21,7 +21,8 @@ def main(args):
     # Create a pytorch dataset
     data_dir = pathlib.Path('./data/tiny-imagenet-200')
     image_count = len(list(data_dir.glob('**/*.JPEG')))
-    CLASS_NAMES = np.array([item.name for item in (data_dir / 'train').glob('*')])
+    CLASS_NAMES = np.array(
+        [item.name for item in (data_dir / 'train').glob('*')])
     print('Discovered {} images'.format(image_count))
 
     # Create the training data generator
@@ -32,54 +33,46 @@ def main(args):
 
     data_transforms = transforms.Compose([
         transforms.ToTensor(),
-        transforms.Normalize((0, 0, 0), tuple(np.sqrt((255, 255, 255)))),
+        # these are the standard norm vectors used for imagenet
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[
+                             0.229, 0.224, 0.225]),
     ])
-    train_set = torchvision.datasets.ImageFolder(data_dir / 'train', data_transforms)
+    train_set = torchvision.datasets.ImageFolder(
+        data_dir / 'train', data_transforms)
     train_loader = torch.utils.data.DataLoader(train_set, batch_size=batch_size,
                                                shuffle=True, num_workers=4, pin_memory=True)
 
-    # Checking if cuda is available
-    cuda_available = torch.cuda.is_available()
-
     # Creating a model
-    if cuda_available:
-        model = models.resnet50(pretrained=True).cuda()
-    else:
-        model = models.resnet50(pretrained=True)
+    model = models.resnet50(pretrained=True)
 
-    # Other models that I experimented with 
+    # Other models that I experimented with
     #model = models.alexnet(pretrained=True).cuda()
     #model = models.resnet101(pretrained=True).cuda()
 
-    #model.eval()
+    # model.eval()
 
     # Freezing the weights from the pretrained model
     for param in model.parameters():
-      param.requires_grad = False
+        param.requires_grad = False
 
     # Creating a final fully connected layer that will be trained in the training loop
     number_of_features = model.fc.in_features
-    model.fc = nn.Linear(number_of_features, 200)
+    # model.fc = nn.Linear(number_of_features, 200)
 
     # Could alternatively have used len(CLASS_NAMES), instead of 200, like I did below
-    #model.fc = nn.Linear(number_of_features, len(CLASS_NAMES))
+    model.fc = nn.Linear(number_of_features, len(CLASS_NAMES))
+    model.to(device)
 
     # We should experiment with other optimizers as well
     optim = torch.optim.Adam(model.parameters())
 
-    if cuda_available:
-        criterion = nn.CrossEntropyLoss().cuda()
-    else:
-        criterion = nn.CrossEntropyLoss()
+    criterion = nn.CrossEntropyLoss().to(device)
 
     for i in range(num_epochs):
-        train_total, train_correct = 0,0
+        train_total, train_correct = 0, 0
         for idx, (inputs, targets) in enumerate(train_loader):
-            # Sometimes it does not print training accuracies as the model is training, so uncomment the line below to see accuracies during training
-            #print(" printing accuracies during training\n")
-            if cuda_available:
-                inputs = inputs.cuda()
-                targets = targets.cuda()
+            inputs = inputs.to(device)
+            targets = targets.to(device)
             optim.zero_grad()
             outputs = model(inputs)
             loss = criterion(outputs, targets)
@@ -88,19 +81,45 @@ def main(args):
             _, predicted = outputs.max(1)
             train_total += targets.size(0)
             train_correct += predicted.eq(targets).sum().item()
-            print("\r", end='')
-            print(f'training {100 * idx / len(train_loader):.2f}%: {train_correct / train_total:.3f}', end='')
-        torch.save({
+            # print("\r", end='')
+            if idx % int(len(train_loader)*0.01):
+                print(
+                    f'training {100 * idx / len(train_loader):.2f}%: {train_correct / train_total:.3f}')
+        # torch.save({
+        #     'net': model.state_dict(),
+        # }, 'latest.pt')
+        save_checkpoint({
+            'epoch': i+1,
             'net': model.state_dict(),
+            'acc': 1.*train_correct/train_total,
         }, 'latest.pt')
+
+
+best_acc = 0
+
+
+def save_checkpoint(metadata, filename):
+    global best_acc
+    torch.save(metadata, filename)
+    if metadata['acc'] > best_acc:
+        best_acc = metadata['acc']
+        shutil.copyfile(filename, 'best.pt')
 
 
 if __name__ == '__main__':
     print("Using GPU:", torch.cuda.is_available())
+    if torch.cuda.is_available():
+        dev = "cuda:0"
+    else:
+        dev = "cpu"
+    device = torch.device(dev)
     parser = argparse.ArgumentParser()
     parser.add_argument("-B", help="batch size", default=32, type=int)
     parser.add_argument("-H", help="image height", default=64, type=int)
     parser.add_argument("-W", help="image width", default=64, type=int)
     parser.add_argument("-E", help="num epochs", default=10, type=int)
+    parser.add_argument("-lr", help="learning rate", default=0.1, type=float)
+    parser.add_argument("-m", help='momentum', default=0.9, type=float)
+    parser.add_argument("-wd", help="weight decay", default=1e-4, type=float)
     args = parser.parse_args()
     main(args)
