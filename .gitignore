@@ -1,6 +1,6 @@
 data/*
 !data/get_data.sh
-
+*.pt
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

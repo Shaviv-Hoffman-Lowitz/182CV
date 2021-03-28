@@ -6,6 +6,7 @@ and to validate your own code submission.
 """
 
 import argparse
+import shutil
 import pathlib
 import numpy as np
 import torch
@@ -32,6 +33,7 @@ def main(args):
     num_epochs = args.E
 
     data_transforms = transforms.Compose([
+        transforms.Resize((im_height, im_width)),
         transforms.ToTensor(),
         # these are the standard norm vectors used for imagenet
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[
@@ -82,7 +84,7 @@ def main(args):
             train_total += targets.size(0)
             train_correct += predicted.eq(targets).sum().item()
             # print("\r", end='')
-            if idx % int(len(train_loader)*0.01):
+            if idx % args.freq == 0:
                 print(
                     f'training {100 * idx / len(train_loader):.2f}%: {train_correct / train_total:.3f}')
         # torch.save({
@@ -121,5 +123,7 @@ if __name__ == '__main__':
     parser.add_argument("-lr", help="learning rate", default=0.1, type=float)
     parser.add_argument("-m", help='momentum', default=0.9, type=float)
     parser.add_argument("-wd", help="weight decay", default=1e-4, type=float)
+    parser.add_argument(
+        "-freq", help="print frequency, in batches", default=10, type=int)
     args = parser.parse_args()
     main(args)
