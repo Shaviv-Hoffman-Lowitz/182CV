@@ -12,6 +12,7 @@ import numpy as np
 import torch
 import torchvision
 import torchvision.transforms as transforms
+import time
 
 from model import Net
 from torchvision import models
@@ -45,7 +46,7 @@ def main(args):
                                                shuffle=True, num_workers=4, pin_memory=True)
 
     # Creating a model
-    model = models.resnet50(pretrained=True)
+    model = models.resnext101_32x8d(pretrained=True)
 
     # Other models that I experimented with
     #model = models.alexnet(pretrained=True).cuda()
@@ -69,9 +70,9 @@ def main(args):
     optim = torch.optim.Adam(model.parameters())
 
     criterion = nn.CrossEntropyLoss().to(device)
-
     for i in range(num_epochs):
         train_total, train_correct = 0, 0
+        start_time = time.time()
         for idx, (inputs, targets) in enumerate(train_loader):
             inputs = inputs.to(device)
             targets = targets.to(device)
@@ -85,8 +86,10 @@ def main(args):
             train_correct += predicted.eq(targets).sum().item()
             # print("\r", end='')
             if idx % args.freq == 0:
-                print(
-                    f'training {100 * idx / len(train_loader):.2f}%: {train_correct / train_total:.3f}')
+                print(f"""
+                training {100 * idx / len(train_loader):.2f}%: {train_correct / train_total:.3f}\n
+                Exe Time Per Image: {(time.time()-start_time)/((1+idx)*args.B)} s
+                """)
         # torch.save({
         #     'net': model.state_dict(),
         # }, 'latest.pt')
