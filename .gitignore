@@ -1,10 +1,6 @@
 data/*
 !data/get_data.sh
-<<<<<<< HEAD
 *.pt
-=======
-
->>>>>>> 23c139e (added gitignore)
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

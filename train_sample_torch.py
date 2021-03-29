@@ -46,22 +46,19 @@ def main(args):
                                                shuffle=True, num_workers=4, pin_memory=True)
 
     # Creating a model
-    model = models.drn_d_105(pretrained=True)
-
-    # Other models that I experimented with
-    #model = models.alexnet(pretrained=True).cuda()
-    #model = models.resnet101(pretrained=True).cuda()
+    model = models.drn_d_105(
+        pretrained=True, pool_size=(im_height//8, im_width//8))
 
     # Freezing the weights from the pretrained model
     for param in model.parameters():
         param.requires_grad = False
 
     # Creating a final fully connected layer that will be trained in the training loop
-    number_of_features = model.fc.in_features
-    # model.fc = nn.Linear(number_of_features, 200)
+    number_of_features = model.out_dim
 
     # Could alternatively have used len(CLASS_NAMES), instead of 200, like I did below
-    model.fc = nn.Linear(number_of_features, len(CLASS_NAMES))
+    model.fc = nn.Conv2d(number_of_features, len(CLASS_NAMES), kernel_size=1,
+                         stride=1, padding=0, bias=True)
     model.to(device)
 
     # We should experiment with other optimizers as well
@@ -118,19 +115,16 @@ if __name__ == '__main__':
     else:
         dev = "cpu"
     device = torch.device(dev)
-<< << << < HEAD
-== == == =
 
->>>>>> > fbdf95e(fixed cuda)
-parser = argparse.ArgumentParser()
-parser.add_argument("-B", help="batch size", default=32, type=int)
-parser.add_argument("-H", help="image height", default=64, type=int)
-parser.add_argument("-W", help="image width", default=64, type=int)
-parser.add_argument("-E", help="num epochs", default=10, type=int)
-parser.add_argument("-lr", help="learning rate", default=0.1, type=float)
-parser.add_argument("-m", help='momentum', default=0.9, type=float)
-parser.add_argument("-wd", help="weight decay", default=1e-4, type=float)
-parser.add_argument(
-    "-freq", help="print frequency, in batches", default=10, type=int)
-args = parser.parse_args()
-main(args)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-B", help="batch size", default=32, type=int)
+    parser.add_argument("-H", help="image height", default=64, type=int)
+    parser.add_argument("-W", help="image width", default=64, type=int)
+    parser.add_argument("-E", help="num epochs", default=10, type=int)
+    parser.add_argument("-lr", help="learning rate", default=0.1, type=float)
+    parser.add_argument("-m", help='momentum', default=0.9, type=float)
+    parser.add_argument("-wd", help="weight decay", default=1e-4, type=float)
+    parser.add_argument(
+        "-freq", help="print frequency, in batches", default=10, type=int)
+    args = parser.parse_args()
+    main(args)
