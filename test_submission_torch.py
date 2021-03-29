@@ -9,6 +9,7 @@ from EvalDataset import EvalDataset
 from model import Net
 from torchvision import models
 from torch import nn
+from common import AverageMeter, accuracy
 
 
 def exportCSV():
@@ -43,7 +44,7 @@ def main(args):
     print("Loading Model Epoch", ckpt['epoch'], "with train acc", ckpt['acc'])
 
     # Creating a model
-    model = models.resnet50(pretrained=True)
+    model = models.resnext101_32x8d(pretrained=False)
     number_of_features = model.fc.in_features
     model.fc = nn.Linear(number_of_features, len(CLASSES))
 
@@ -58,27 +59,31 @@ def main(args):
                              0.229, 0.224, 0.225]),
     ])
 
-    if args.CSV:
-        exportCSV()
-    else:
-        data_dir = pathlib.Path('./data/tiny-imagenet-200')
-        eval_set = EvalDataset(
-            data_dir / 'val', data_transforms, CLASSES, 'val_annotations.txt')
-        eval_loader = torch.utils.data.DataLoader(eval_set, batch_size=args.B,
-                                                  shuffle=True, num_workers=4, pin_memory=True)
+    with torch.no_grad():
+        if args.CSV:
+            exportCSV()
+        else:
 
-        train_total, train_correct = 0, 0
-        for idx, (inputs, targets) in enumerate(eval_loader):
-            inputs = inputs.to(device)
-            targets = targets.to(device)
-            outputs = model(inputs)
-            _, predicted = outputs.max(1)
-            train_total += targets.size(0)
-            train_correct += predicted.eq(targets).sum().item()
-            if idx % args.freq == 0:
-                print(
-                    f'Evaluating {100 * idx / len(eval_loader):.2f}%: {train_correct / train_total:.3f}')
-        print(f"Accuracy on Val Set: {train_correct/train_total * 100:.2f}%")
+            data_dir = pathlib.Path('./data/tiny-imagenet-200')
+            eval_set = EvalDataset(
+                data_dir / 'val', data_transforms, CLASSES, 'val_annotations.txt')
+            eval_loader = torch.utils.data.DataLoader(eval_set, batch_size=args.B,
+                                                      shuffle=True, num_workers=4, pin_memory=True)
+
+            top1 = AverageMeter()
+            top5 = AverageMeter()
+            for idx, (inputs, targets) in enumerate(eval_loader):
+                inputs = inputs.to(device)
+                targets = targets.to(device)
+                outputs = model(inputs)
+                prec1, prec5 = accuracy(outputs, targets, topk=(1, 5))
+                top1.update(prec1.item(), inputs.size(0))
+                top5.update(prec5.item(), inputs.size(0))
+                if idx % args.freq == 0:
+                    print(
+                        f'Evaluating {100 * idx / len(eval_loader):.2f}%')
+            print(
+                f"Accuracy on Val Set:\n\tTop 1: {top1.avg:.2f}%\n\tTop 5: {top5.avg:.2f}%")
 
 
 if __name__ == '__main__':
