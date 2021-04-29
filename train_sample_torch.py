@@ -14,6 +14,10 @@ import torchvision
 import torchvision.transforms as transforms
 import time
 
+from art.estimators.classification import PyTorchClassifier
+from art.attacks.evasion import SpatialTransformation, DeepFool, SquareAttack, FastGradientMethod, BasicIterativeMethod
+from art.defenses.trainer import AdversarialTrainer
+
 from model import Net
 from torchvision import models
 from torch import nn
@@ -42,8 +46,18 @@ def main(args):
     ])
     train_set = torchvision.datasets.ImageFolder(
         data_dir / 'train', data_transforms)
-    train_loader = torch.utils.data.DataLoader(train_set, batch_size=batch_size,
-                                               shuffle=True, num_workers=4, pin_memory=True)
+
+    # Changed it so that the batch size is len(train_set) to try to get training_data and training_labels to be of the right shapes
+    # so that I can pass them into the fit function later on
+    train_loader = torch.utils.data.DataLoader(train_set, batch_size=len(train_set),
+                                                shuffle=True, num_workers=4, pin_memory=True)
+
+    # Need to figure out how to speed this up
+    training_data = next(iter(train_loader))[0].numpy()
+
+    # I think we will need to one-hot encode the labels before we can pass them into the fit function later on, not 100% positive
+    # Also needs to be sped up
+    training_labels = next(iter(train_loader))[1].numpy()
 
     # Creating a model
     model = models.resnext101_32x8d(pretrained=True)
@@ -66,10 +80,48 @@ def main(args):
     model.fc = nn.Linear(number_of_features, len(CLASS_NAMES))
     model.to(device)
 
-    # We should experiment with other optimizers as well
+    # We should experiment with other optimizers, and the learning rate for the optimizers, as well
     optim = torch.optim.Adam(model.parameters())
-
     criterion = nn.CrossEntropyLoss().to(device)
+
+
+    initial_classifier = PyTorchClassifier(model = model, optimizer = optim, loss = criterion, nb_classes = len(CLASS_NAMES), input_shape = (3, im_height, im_width))
+
+    adversarial_attacks = []
+
+    adversarial_attacks.append(SpatialTransformation(initial_classifier, 20, 1, 30, 1))
+
+    adversarial_attacks.append(DeepFool(initial_classifier))
+
+    adversarial_attacks.append(BasicIterativeMethod(initial_classifier))
+
+    adversarial_attacks.append(SquareAttack(initial_classifier))
+
+    adversarial_attacks.append(FastGradientMethod(initial_classifier))
+
+    # Can experiment with the last parameter
+    adversarially_trained_model = AdversarialTrainer(initial_classifier, adversarial_attacks, 0.5)
+
+    adversarially_trained_model.fit(training_data, training_labels, nb_epochs = num_epochs, batch_size = batch_size)
+
+    model_predictions = adversarially_trained_model.predict(training_data)
+    model_predictions = np.argmax(model_predictions, axis = 1)
+
+    correct_classes = np.argmax(training_labels, axis = 1)
+
+    total_correct = np.sum(model_predictions == correct_classes)
+
+    # I think it is fine to use image_count as the denominator, right?
+    final_accuracy = total_correct/image_count
+
+
+
+
+
+
+
+
+
     for i in range(num_epochs):
         train_total, train_correct = 0, 0
         start_time = time.time()
