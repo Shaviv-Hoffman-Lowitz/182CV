@@ -116,15 +116,15 @@ def main(args):
 
 
 
-# torch.save({
-#     'net': model.state_dict(),
-# }, 'latest.pt')
+    # torch.save({
+    #     'net': model.state_dict(),
+    # }, 'latest.pt')
     
-#save_checkpoint({
-    #'epoch': i+1,
-    #'net': model.state_dict(),
-    #'acc': 1.*train_correct/train_total,
-#}, 'latest.pt')
+    #save_checkpoint({
+        #'epoch': i+1,
+        #'net': model.state_dict(),
+        #'acc': 1.*train_correct/train_total,
+    #}, 'latest.pt')
 
 
 best_acc = 0
