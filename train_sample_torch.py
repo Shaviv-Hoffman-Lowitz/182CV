@@ -116,40 +116,15 @@ def main(args):
 
 
 
-
-
-
-
-
-
-    for i in range(num_epochs):
-        train_total, train_correct = 0, 0
-        start_time = time.time()
-        for idx, (inputs, targets) in enumerate(train_loader):
-            inputs = inputs.to(device)
-            targets = targets.to(device)
-            optim.zero_grad()
-            outputs = model(inputs)
-            loss = criterion(outputs, targets)
-            loss.backward()
-            optim.step()
-            _, predicted = outputs.max(1)
-            train_total += targets.size(0)
-            train_correct += predicted.eq(targets).sum().item()
-            # print("\r", end='')
-            if idx % args.freq == 0:
-                print(f"""
-                training {100 * idx / len(train_loader):.2f}%: {train_correct / train_total:.3f}\n
-                Exe Time Per Image: {(time.time()-start_time)/((1+idx)*args.B)} s
-                """)
-        # torch.save({
-        #     'net': model.state_dict(),
-        # }, 'latest.pt')
-        save_checkpoint({
-            'epoch': i+1,
-            'net': model.state_dict(),
-            'acc': 1.*train_correct/train_total,
-        }, 'latest.pt')
+# torch.save({
+    #     'net': model.state_dict(),
+    # }, 'latest.pt')
+    
+#save_checkpoint({
+    #'epoch': i+1,
+    #'net': model.state_dict(),
+    #'acc': 1.*train_correct/train_total,
+#}, 'latest.pt')
 
 
 best_acc = 0
