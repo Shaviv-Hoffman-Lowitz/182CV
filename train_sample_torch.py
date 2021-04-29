@@ -117,8 +117,8 @@ def main(args):
 
 
 # torch.save({
-    #     'net': model.state_dict(),
-    # }, 'latest.pt')
+#     'net': model.state_dict(),
+# }, 'latest.pt')
     
 #save_checkpoint({
     #'epoch': i+1,
