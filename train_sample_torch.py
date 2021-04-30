@@ -46,7 +46,7 @@ def main(args):
                                                shuffle=True, num_workers=4, pin_memory=True)
 
     # Creating a model
-    model = models.drn_d_105(
+    model = models.drn_d_22(
         pretrained=True, pool_size=(im_height//8, im_width//8))
 
     # Freezing the weights from the pretrained model

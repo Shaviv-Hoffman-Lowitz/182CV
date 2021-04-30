@@ -7,7 +7,8 @@ import torch
 import torchvision.transforms as transforms
 from EvalDataset import EvalDataset
 from model import Net
-from torchvision import models
+# from torchvision import models
+import drn as models
 from torch import nn
 from common import AverageMeter, accuracy
 
@@ -44,9 +45,11 @@ def main(args):
     print("Loading Model Epoch", ckpt['epoch'], "with train acc", ckpt['acc'])
 
     # Creating a model
-    model = models.resnext101_32x8d(pretrained=False)
-    number_of_features = model.fc.in_features
-    model.fc = nn.Linear(number_of_features, len(CLASSES))
+    model = models.drn_d_22(
+        pretrained=False, pool_size=(im_height//8, im_width//8))
+    number_of_features = model.out_dim
+    model.fc = nn.Conv2d(number_of_features, len(CLASSES), kernel_size=1,
+                         stride=1, padding=0, bias=True)
 
     model.load_state_dict(ckpt['net'])
     model.to(device)
