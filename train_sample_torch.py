@@ -14,7 +14,7 @@ import torchvision
 import torchvision.transforms as transforms
 import time
 
-from art.estimators.classification import PyTorchClassifier
+from art.estimators.classification import PyTorchClassifier, EnsembleClassifier
 from art.attacks.evasion import SpatialTransformation, DeepFool, SquareAttack, FastGradientMethod, BasicIterativeMethod
 
 from model import Net
@@ -149,17 +149,29 @@ def main(args):
         model.fit(adversarial_dataset, training_labels, nb_epochs = num_epochs, batch_size = batch_size)
 
     # Now we need to ensemble the models together (should we also include the initial_classifier, which was trained on normal, non-adversarial data, in our ensemble?)
+    pretrained_models.append(initial_classifier)
 
+    # Could experiment with giving different weights to each classifier, but by default all the classifiers get assigned the same weight
+    ensemble_model = EnsembleClassifier(classifiers = pretrained_models, channels_first = True)
 
+    ensemble_prediction_probabilities = ensemble_model.predict(x = training_data, batch_size = batch_size, raw = False)
 
+    ensemble_predictions = np.argmax(ensemble_prediction_probabilities, axis = 1)
 
+    total_correct = np.sum(model_predictions == training_labels)
 
+    # I think it is fine to use image_count as the denominator, right?
+    final_accuracy = total_correct/image_count
+    
+    print("final training accuracy is: " + str(final_accuracy))
 
+    # The get_params() method returns a dictionary that maps parameter name strings to the values of those parameters
+    ensemble_model_parameters = ensemble_model.get_params()
 
-
-    # torch.save({
-    #     'net': model.state_dict(),
-    # }, 'latest.pt')
+    # I think saving it like this should be ok? Not 100% sure
+    torch.save({
+         'net': ensemble_model_parameters,
+    }, 'latest.pt')
     
     #save_checkpoint({
         #'epoch': i+1,
