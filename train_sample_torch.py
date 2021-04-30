@@ -16,7 +16,10 @@ import time
 
 from art.estimators.classification import PyTorchClassifier
 from art.attacks.evasion import SpatialTransformation, DeepFool, SquareAttack, FastGradientMethod, BasicIterativeMethod
-from art.defenses.trainer import AdversarialTrainer
+from art.defences.trainer import AdversarialTrainer
+from art.data_generators import PyTorchDataGenerator
+
+# from ignite.metrics import Accuracy, Precision, Recall
 
 from model import Net
 from torchvision import models
@@ -48,25 +51,14 @@ def main(args):
         data_dir / 'train', data_transforms)
 
     # Note: might need to try to add lots of Cuda stuff throughout the function, because I don't have it now
-    
+
     # Changed it so that the batch size is len(train_set) to try to get training_data and training_labels to be of the right shapes
     # so that I can pass them into the fit function later on
-    train_loader = torch.utils.data.DataLoader(train_set, batch_size=len(train_set),
-                                                shuffle=True, num_workers=4, pin_memory=True)
-
-    # Need to figure out how to speed this up
-    training_data = next(iter(train_loader))[0].numpy()
-
-    # Training labels should not be one-hot encoded, and they already aren't (I think) which is good
-    # Also needs to be sped up
-    training_labels = next(iter(train_loader))[1].numpy()
+    train_loader = PyTorchDataGenerator(torch.utils.data.DataLoader(train_set, batch_size=batch_size,
+                                                                    shuffle=True, num_workers=4, pin_memory=True), len(train_set), batch_size=batch_size)
 
     # Creating a model
-    model = models.resnext101_32x8d(pretrained=True)
-
-    # Other models that I experimented with
-    #model = models.alexnet(pretrained=True).cuda()
-    #model = models.resnet101(pretrained=True).cuda()
+    model = models.resnet50(pretrained=True)
 
     # model.eval()
 
@@ -76,22 +68,24 @@ def main(args):
 
     # Creating a final fully connected layer that will be trained in the training loop
     number_of_features = model.fc.in_features
-    # model.fc = nn.Linear(number_of_features, 200)
 
     # Could alternatively have used len(CLASS_NAMES), instead of 200, like I did below
     model.fc = nn.Linear(number_of_features, len(CLASS_NAMES))
     model.to(device)
 
     # We should experiment with other optimizers, and the learning rate for the optimizers, as well
-    optim = torch.optim.Adam(model.parameters())
+    optim = torch.optim.Adam(
+        model.parameters(), lr=args.lr, weight_decay=args.wd)
     criterion = nn.CrossEntropyLoss().to(device)
 
     # I'm assuming that the model's frozen parameters stay frozen, not 100% sure if they do
-    initial_classifier = PyTorchClassifier(model = model, optimizer = optim, loss = criterion, nb_classes = len(CLASS_NAMES), input_shape = (3, im_height, im_width), device_type = 'gpu')
+    initial_classifier = PyTorchClassifier(model=model, optimizer=optim, loss=criterion, nb_classes=len(
+        CLASS_NAMES), input_shape=(3, im_height, im_width), device_type='gpu')
 
     adversarial_attacks = []
 
-    adversarial_attacks.append(SpatialTransformation(initial_classifier, 20, 1, 30, 1))
+    adversarial_attacks.append(SpatialTransformation(
+        initial_classifier, 20, 1, 30, 1))
 
     adversarial_attacks.append(DeepFool(initial_classifier))
 
@@ -102,37 +96,40 @@ def main(args):
     adversarial_attacks.append(FastGradientMethod(initial_classifier))
 
     # Can experiment with the last parameter
-    adversarially_trained_model = AdversarialTrainer(initial_classifier, adversarial_attacks, 0.5)
+    adversarially_trained_model = AdversarialTrainer(
+        initial_classifier, adversarial_attacks, 0.5)
 
-    adversarially_trained_model.fit(training_data, training_labels, nb_epochs = num_epochs, batch_size = batch_size)
+    adversarially_trained_model.fit_generator(
+        train_loader, nb_epochs=num_epochs)
 
-    model_predictions = adversarially_trained_model.predict(training_data)
-    model_predictions = np.argmax(model_predictions, axis = 1)
+    # model_predictions = adversarially_trained_model.predict(training_data)
+    # model_predictions = np.argmax(model_predictions, axis = 1)
 
-    total_correct = np.sum(model_predictions == training_labels)
+    # total_correct = np.sum(model_predictions == training_labels)
 
-    # I think it is fine to use image_count as the denominator, right?
-    final_accuracy = total_correct/image_count
-    
-    print("final training accuracy is: " + str(final_accuracy))
+    # # I think it is fine to use image_count as the denominator, right?
+    # final_accuracy = total_correct/image_count
+
+    # print("final training accuracy is: " + str(final_accuracy))
 
     # I think this should work, right?
     final_classifier = adversarially_trained_model.get_classifier()
 
     # The get_params() method returns a dictionary that maps parameter name strings to the values of those parameters
     # There is also a 'model' variable and a 'save' function that could be useful if get_params() doesn't work how we want
-    final_classifier_parameters = final_classifier.get_params()
 
     # I think saving it like this should be ok? Not 100% sure
-    torch.save({
-         'net': model.state_dict(),
-    }, 'latest.pt')
-    
-    #save_checkpoint({
-        #'epoch': i+1,
-        #'net': model.state_dict(),
-        #'acc': 1.*train_correct/train_total,
-    #}, 'latest.pt')
+    # torch.save({
+    #     'net': model.state_dict(),
+    # }, 'latest.pt')
+    print("saving!")
+    final_classifier.save('latest.pt')
+
+    # save_checkpoint({
+    # 'epoch': i+1,
+    # 'net': model.state_dict(),
+    # 'acc': 1.*train_correct/train_total,
+    # }, 'latest.pt')
 
 
 best_acc = 0
@@ -158,8 +155,7 @@ if __name__ == '__main__':
     parser.add_argument("-H", help="image height", default=64, type=int)
     parser.add_argument("-W", help="image width", default=64, type=int)
     parser.add_argument("-E", help="num epochs", default=10, type=int)
-    parser.add_argument("-lr", help="learning rate", default=0.1, type=float)
-    parser.add_argument("-m", help='momentum', default=0.9, type=float)
+    parser.add_argument("-lr", help="learning rate", default=0.001, type=float)
     parser.add_argument("-wd", help="weight decay", default=1e-4, type=float)
     parser.add_argument(
         "-freq", help="print frequency, in batches", default=10, type=int)
