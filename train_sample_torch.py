@@ -55,7 +55,7 @@ def main(args):
     # Need to figure out how to speed this up
     training_data = next(iter(train_loader))[0].numpy()
 
-    # training labels should not be one-hot encoded, and they already aren't (I think) which is good
+    # Training labels should not be one-hot encoded, and they already aren't (I think) which is good
     # Also needs to be sped up
     training_labels = next(iter(train_loader))[1].numpy()
 
