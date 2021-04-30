@@ -86,6 +86,7 @@ def main(args):
 
     # Not sure if we should train the initial classifier on the training data before we use the initial_classifier to generate adversarial datasets
     # Definitely should experiment with both ways if we're not sure
+    # Also, I'm assuming that the model's frozen parameters stay frozen, not 100% sure if they do
     initial_classifier = PyTorchClassifier(model = model, optimizer = optim, loss = criterion, nb_classes = len(CLASS_NAMES), input_shape = (3, im_height, im_width), device_type = 'gpu')
     initial_classifier.fit(training_data, training_labels, nb_epochs = num_epochs, batch_size = batch_size)
 
