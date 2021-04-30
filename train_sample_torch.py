@@ -59,7 +59,7 @@ def main(args):
     training_labels = next(iter(train_loader))[1].numpy()
 
     # Creating a model
-    model = models.resnext101_32x8d(pretrained=True)
+    model = models.resnet50(pretrained=True)
 
     # Other models that I experimented with
     #model = models.alexnet(pretrained=True).cuda()
@@ -121,7 +121,7 @@ def main(args):
     # Generating 5 pretrained models, where only the last layer is not frozen - I think this is necessary, right?
     pretrained_models = []
     for num_iterations in range(5):
-        model = models.resnext101_32x8d(pretrained=True)
+        model = models.resnet50(pretrained=True)
 
         # Freezing the weights from the pretrained model
         for param in model.parameters():
