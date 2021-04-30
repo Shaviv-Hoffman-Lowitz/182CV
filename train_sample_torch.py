@@ -107,9 +107,7 @@ def main(args):
     model_predictions = adversarially_trained_model.predict(training_data)
     model_predictions = np.argmax(model_predictions, axis = 1)
 
-    correct_classes = np.argmax(training_labels, axis = 1)
-
-    total_correct = np.sum(model_predictions == correct_classes)
+    total_correct = np.sum(model_predictions == training_labels)
 
     # I think it is fine to use image_count as the denominator, right?
     final_accuracy = total_correct/image_count
