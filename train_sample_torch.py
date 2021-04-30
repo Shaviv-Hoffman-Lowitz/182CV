@@ -55,7 +55,7 @@ def main(args):
     # Need to figure out how to speed this up
     training_data = next(iter(train_loader))[0].numpy()
 
-    # I think we will need to one-hot encode the labels before we can pass them into the fit function later on, not 100% positive
+    # training labels should not be one-hot encoded, and they already aren't (I think) which is good
     # Also needs to be sped up
     training_labels = next(iter(train_loader))[1].numpy()
 
@@ -85,7 +85,7 @@ def main(args):
     criterion = nn.CrossEntropyLoss().to(device)
 
     # I'm assuming that the model's frozen parameters stay frozen, not 100% sure if they do
-    initial_classifier = PyTorchClassifier(model = model, optimizer = optim, loss = criterion, nb_classes = len(CLASS_NAMES), input_shape = (3, im_height, im_width))
+    initial_classifier = PyTorchClassifier(model = model, optimizer = optim, loss = criterion, nb_classes = len(CLASS_NAMES), input_shape = (3, im_height, im_width), device_type = 'gpu')
 
     adversarial_attacks = []
 
@@ -114,11 +114,17 @@ def main(args):
     
     print("final training accuracy is: " + str(final_accuracy))
 
+    # I think this should work, right?
+    final_classifier = adversarially_trained_model.get_classifier()
 
+    # The get_params() method returns a dictionary that maps parameter name strings to the values of those parameters
+    # There is also a 'model' variable and a 'save' function that could be useful if get_params() doesn't work how we want
+    final_classifier_parameters = final_classifier.get_params()
 
-    # torch.save({
-    #     'net': model.state_dict(),
-    # }, 'latest.pt')
+    # I think saving it like this should be ok? Not 100% sure
+    torch.save({
+         'net': model.state_dict(),
+    }, 'latest.pt')
     
     #save_checkpoint({
         #'epoch': i+1,
