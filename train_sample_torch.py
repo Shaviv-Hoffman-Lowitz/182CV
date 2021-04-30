@@ -84,7 +84,7 @@ def main(args):
     optim = torch.optim.Adam(model.parameters())
     criterion = nn.CrossEntropyLoss().to(device)
 
-
+    # I'm assuming that the model's frozen parameters stay frozen, not 100% sure if they do
     initial_classifier = PyTorchClassifier(model = model, optimizer = optim, loss = criterion, nb_classes = len(CLASS_NAMES), input_shape = (3, im_height, im_width))
 
     adversarial_attacks = []
@@ -113,6 +113,8 @@ def main(args):
 
     # I think it is fine to use image_count as the denominator, right?
     final_accuracy = total_correct/image_count
+    
+    print(final_accuracy)
 
 
 
