@@ -46,6 +46,8 @@ def main(args):
     train_set = torchvision.datasets.ImageFolder(
         data_dir / 'train', data_transforms)
 
+    # Note: might need to try to add lots of Cuda stuff throughout the function, because I don't have it now
+    
     # Changed it so that the batch size is len(train_set) to try to get training_data and training_labels to be of the right shapes
     # so that I can pass them into the fit function later on
     train_loader = torch.utils.data.DataLoader(train_set, batch_size=len(train_set),
@@ -54,7 +56,7 @@ def main(args):
     # Need to figure out how to speed this up
     training_data = next(iter(train_loader))[0].numpy()
 
-    # Can be one-hot encoded or not, either way is totally fine
+    # Training labels should not be one-hot encoded, and they already aren't (I think) which is good
     # Also needs to be sped up
     training_labels = next(iter(train_loader))[1].numpy()
 
