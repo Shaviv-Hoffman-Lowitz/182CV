@@ -163,7 +163,7 @@ def main(args):
     total_correct = np.sum(model_predictions == training_labels)
 
     # I think it is fine to use image_count as the denominator, right?
-    final_accuracy = total_correct/image_count
+    final_accuracy = total_correct/len(train_set)
     
     print("final training accuracy is: " + str(final_accuracy))
 
