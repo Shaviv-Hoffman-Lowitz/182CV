@@ -114,7 +114,7 @@ def main(args):
     # I think it is fine to use image_count as the denominator, right?
     final_accuracy = total_correct/image_count
     
-    print(final_accuracy)
+    print("final training accuracy is: " + str(final_accuracy))
 
 
 
