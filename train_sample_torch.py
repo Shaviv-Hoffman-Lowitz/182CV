@@ -50,22 +50,26 @@ def main(args):
     
     # Changed it so that the batch size is len(train_set) to try to get training_data and training_labels to be of the right shapes
     # so that I can pass them into the fit function later on
-    train_loader = torch.utils.data.DataLoader(train_set, batch_size=len(train_set),
-                                                shuffle=True, num_workers=4, pin_memory=True)
+    train_loader = torch.utils.data.DataLoader(train_set, batch_size=1,
+                                    shuffle=True, num_workers=1, pin_memory=True)
+ 
+    training_data_list = []
+    training_labels = []
+    for idx, (inputs, targets) in enumerate(train_loader):
+      if idx <= 10000:
+        training_data_list.append(inputs[0])
+        training_labels.append(targets[0].item())
+      else:
+        break
 
-    # Need to figure out how to speed this up
-    training_data = next(iter(train_loader))[0].numpy()
+    training_labels = np.asarray(training_labels)
 
-    # Training labels should not be one-hot encoded, and they already aren't (I think) which is good
-    # Also needs to be sped up
-    training_labels = next(iter(train_loader))[1].numpy()
+    training_data_list = [training_data_list[index].numpy() for index in range(len(training_data_list))]
+
+    training_data = np.asarray(training_data_list)
 
     # Creating a model
     model = models.resnet50(pretrained=True)
-
-    # Other models that I experimented with
-    #model = models.alexnet(pretrained=True).cuda()
-    #model = models.resnet101(pretrained=True).cuda()
 
     # model.eval()
 
@@ -89,27 +93,28 @@ def main(args):
     # Not sure if we should train the initial classifier on the training data before we use the initial_classifier to generate adversarial datasets
     # Definitely should experiment with both ways if we're not sure
     # Also, I'm assuming that the model's frozen parameters stay frozen, not 100% sure if they do
-    initial_classifier = PyTorchClassifier(model = model, optimizer = optim, loss = criterion, nb_classes = len(CLASS_NAMES), input_shape = (3, im_height, im_width), device_type = 'gpu')
+    initial_classifier = PyTorchClassifier(model = model, optimizer = optim, loss = criterion, nb_classes = len(CLASS_NAMES), input_shape = (3, im_height, im_width), device_type = 'gpu', clip_values = (0.0, 1.0))
     initial_classifier.fit(training_data, training_labels, nb_epochs = num_epochs, batch_size = batch_size)
 
-    square_attack = SquareAttack(initial_classifier)
+    #square_attack = SquareAttack(initial_classifier)
 
-    spatial_transformation_attack = SpatialTransformation(initial_classifier, 20, 1, 30, 1)
+    #spatial_transformation_attack = SpatialTransformation(initial_classifier, 20, 1, 30, 1)
 
-    deepfool_attack = DeepFool(initial_classifier)
-
-    basic_iterative_method_attack = BasicIterativeMethod(initial_classifier)
+    #deepfool_attack = DeepFool(initial_classifier)
 
     fast_gradient_method_attack = FastGradientMethod(initial_classifier)
 
+    basic_iterative_method_attack = BasicIterativeMethod(initial_classifier)
+
+
     # training_labels do not need to be passed in, it is optional - should experiment with both ways
-    square_attack_adversarial_dataset = square_attack.generate(training_data)
+    #square_attack_adversarial_dataset = square_attack.generate(training_data)
 
     # Labels are not optional for this attack, its not totally clear whether training_labels are supposed be one-hot encoded or not
-    deepfool_adversarial_dataset = deepfool_attack.generate(training_data, training_labels)
+    #deepfool_adversarial_dataset = deepfool_attack.generate(training_data, training_labels)
 
     # Labels are not optional for this attack, its not totally clear whether training_labels are supposed be one-hot encoded or not
-    spatial_transformation_adversarial_dataset = spatial_transformation_attack.generate(training_data, training_labels)
+    #spatial_transformation_adversarial_dataset = spatial_transformation_attack.generate(training_data, training_labels)
 
     # training_labels do not need to be passed in, it is optional - should experiment with both ways
     fast_gradient_method_adversarial_dataset = fast_gradient_method_attack.generate(training_data)
@@ -118,11 +123,11 @@ def main(args):
     basic_iterative_method_adversarial_dataset = basic_iterative_method_attack.generate(training_data)
 
     #Creating a list of the adversarial datasets
-    adversarial_datasets = [square_attack_adversarial_dataset, deepfool_adversarial_dataset, spatial_transformation_adversarial_dataset, fast_gradient_method_adversarial_dataset, basic_iterative_method_adversarial_dataset]
+    adversarial_datasets = [fast_gradient_method_adversarial_dataset, basic_iterative_method_adversarial_dataset]
 
     # Generating 5 pretrained models, where only the last layer is not frozen - I think this is necessary, right?
     pretrained_models = []
-    for num_iterations in range(5):
+    for num_iterations in range(2):
         model = models.resnet50(pretrained=True)
 
         # Freezing the weights from the pretrained model
@@ -139,7 +144,7 @@ def main(args):
         optim = torch.optim.Adam(model.parameters())
         criterion = nn.CrossEntropyLoss().to(device)
 
-        current_classifier = PyTorchClassifier(model = model, optimizer = optim, loss = criterion, nb_classes = len(CLASS_NAMES), input_shape = (3, im_height, im_width), device_type = 'gpu')
+        current_classifier = PyTorchClassifier(model = model, optimizer = optim, loss = criterion, nb_classes = len(CLASS_NAMES), input_shape = (3, im_height, im_width), device_type = 'gpu', clip_values = (0.0, 1.0))
         pretrained_models.append(current_classifier)
 
     # Training the 5 pretrained models, each on a different adversarial dataset
@@ -154,16 +159,15 @@ def main(args):
     pretrained_models.append(initial_classifier)
 
     # Could experiment with giving different weights to each classifier, but by default all the classifiers get assigned the same weight
-    ensemble_model = EnsembleClassifier(classifiers = pretrained_models, channels_first = True)
+    ensemble_model = EnsembleClassifier(classifiers = pretrained_models, channels_first = True, clip_values = (0.0, 1.0))
 
     ensemble_prediction_probabilities = ensemble_model.predict(x = training_data, batch_size = batch_size, raw = False)
 
     ensemble_predictions = np.argmax(ensemble_prediction_probabilities, axis = 1)
 
-    total_correct = np.sum(model_predictions == training_labels)
+    total_correct = np.sum(ensemble_predictions == training_labels)    
 
-    # I think it is fine to use image_count as the denominator, right?
-    final_accuracy = total_correct/len(train_set)
+    final_accuracy = total_correct/len(training_data_list)
     
     print("final training accuracy is: " + str(final_accuracy))
 
