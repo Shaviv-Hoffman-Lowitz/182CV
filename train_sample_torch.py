@@ -20,6 +20,9 @@ from torch import nn
 from ignite.metrics import Accuracy, TopKCategoricalAccuracy  # , Precision, Recall
 from common import AverageMeter
 
+from art.estimators.classification import PyTorchClassifier
+from art.attacks.evasion import FastGradientMethod
+
 
 def main(args):
     # Create a pytorch dataset
@@ -82,6 +85,12 @@ def main(args):
 
     criterion = nn.CrossEntropyLoss().to(device)
 
+    # Might want to mess around with what the clip_values parameter should be, I just kind of guessed
+    pytorch_classifier = PyTorchClassifier(model = model, optimizer = optim, loss = criterion, nb_classes = len(CLASS_NAMES), input_shape = (3, im_height, im_width), device_type = 'gpu', clip_values = (0.0, 1.0))
+
+    # Initialize Fast Gradient Method attack
+    fast_gradient_method_attack = FastGradientMethod(pytorch_classifier)
+
     # Scheduler reduces lr after 5 epochs without loss reduction in validation
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optim, 'min', patience=5)
@@ -97,6 +106,14 @@ def main(args):
 
         start_time = time.time()
         for idx, (inputs, targets) in enumerate(train_loader):
+
+            # Converting inputs to numpy array
+            numpy_inputs = inputs.numpy()
+            adversarial_data = fast_gradient_method_attack.generate(numpy_inputs)
+
+            # Converting the adversarial data, which is currently a numpy array (I think), back to a tensor
+            inputs = torch.from_numpy(adversarial_data)
+
             # Load x, y
             inputs = inputs.to(device)
             targets = targets.to(device)
