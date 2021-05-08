@@ -14,6 +14,7 @@ import torchvision
 import torchvision.transforms as transforms
 import time
 import os
+from EvalDataset import EvalDataset
 
 import pretrainedmodels as models
 from torch import nn
@@ -51,6 +52,11 @@ def main(args):
     train_loader = torch.utils.data.DataLoader(train_set, batch_size=batch_size,
                                                shuffle=True, num_workers=4, pin_memory=True)
 
+    val_set = EvalDataset(
+        data_dir / 'val', data_transforms, sorted([item.name for item in pathlib.Path('./data/tiny-imagenet-200/train/').glob('*')]), 'val_annotations.txt')
+    val_loader = torch.utils.data.DataLoader(val_set, batch_size=args.B,
+                                             shuffle=True, num_workers=4, pin_memory=True)
+
     # Creating a model
     model = models.__dict__[args.model](
         num_classes=1000, pretrained='imagenet')
@@ -86,71 +92,126 @@ def main(args):
     criterion = nn.CrossEntropyLoss().to(device)
 
     # Might want to mess around with what the clip_values parameter should be, I just kind of guessed
-    pytorch_classifier = PyTorchClassifier(model = model, optimizer = optim, loss = criterion, nb_classes = len(CLASS_NAMES), input_shape = (3, im_height, im_width), device_type = 'gpu', clip_values = (0.0, 1.0))
+    pytorch_classifier = PyTorchClassifier(model=model, optimizer=optim, loss=criterion, nb_classes=len(
+        CLASS_NAMES), input_shape=(3, im_height, im_width), device_type='gpu', clip_values=(0.0, 1.0))
 
     # Initialize Fast Gradient Method attack
     fast_gradient_method_attack = FastGradientMethod(pytorch_classifier)
 
     # Scheduler reduces lr after 5 epochs without loss reduction in validation
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optim, 'min', patience=5)
+        optim, 'min', patience=args.patience)
 
     for i in range(start_epoch, num_epochs):
         for param_group in optim.param_groups:
             print('Epoch [{}] Learning rate: {}'.format(
                 i, param_group['lr']))
 
-        acc = Accuracy()
-        top5 = TopKCategoricalAccuracy()
-        avg_loss = AverageMeter()
-
-        start_time = time.time()
-        for idx, (inputs, targets) in enumerate(train_loader):
-
-            # Converting inputs to numpy array
-            numpy_inputs = inputs.numpy()
-            adversarial_data = fast_gradient_method_attack.generate(numpy_inputs)
-
-            # Converting the adversarial data, which is currently a numpy array (I think), back to a tensor
-            inputs = torch.from_numpy(adversarial_data)
-
-            # Load x, y
-            inputs = inputs.to(device)
-            targets = targets.to(device)
-
-            # Execute
-            optim.zero_grad()
-            outputs = model(inputs)
-            loss = criterion(outputs, targets)
-
-            # Update Statistics
-            avg_loss.update(loss.item(), inputs.size(0))
-            acc.update((outputs, targets))
-            top5.update((outputs, targets))
-
-            # Backprop and step
-            loss.backward()
-            optim.step()
-
-            if idx % args.freq == 0:
-                print(f"""
-                Training {100 * idx / len(train_loader):.2f}%: Top1: {acc.compute()*100:.2f} \t Top5: {top5.compute()*100:.2f}\n
-                Loss: {avg_loss.val:.4f} ~ {avg_loss.avg:.4f} \n
-                Exe Time Per Image: {(time.time()-start_time)/((1+idx)*args.B)}s
-                """)
+        acc, top5, avg_loss = train(
+            model, train_loader, fast_gradient_method_attack, optim, criterion)
+        vacc, vtop5, vloss = validate(
+            model, val_loader, fast_gradient_method_attack, criterion)
 
         save_checkpoint({
             'epoch': i+1,
             'net': model.state_dict(),
-            'acc': acc.compute()*100,
-            'top5': top5.compute()*100,
-            'loss': avg_loss.avg
+            'acc': acc,
+            'top5': top5,
+            'loss': avg_loss
         }, 'latest.pt')
 
-        scheduler.step(avg_loss.avg)
+        # Reduce learning rate after no validation loss decrease for args.patience epochs
+        scheduler.step(vloss)
 
 
 best_loss = 0
+
+
+def train(model, train_loader, fast_gradient_method_attack, optim, criterion):
+    model.train()
+    acc = Accuracy()
+    top5 = TopKCategoricalAccuracy()
+    avg_loss = AverageMeter()
+
+    start_time = time.time()
+    for idx, (inputs, targets) in enumerate(train_loader):
+
+        # Converting inputs to numpy array
+        numpy_inputs = inputs.numpy()
+        adversarial_data = fast_gradient_method_attack.generate(
+            numpy_inputs)
+
+        # Converting the adversarial data, which is currently a numpy array (I think), back to a tensor
+        inputs = torch.from_numpy(adversarial_data)
+
+        # Load x, y
+        inputs = inputs.to(device)
+        targets = targets.to(device)
+
+        # Execute
+        optim.zero_grad()
+        outputs = model(inputs)
+        loss = criterion(outputs, targets)
+
+        # Update Statistics
+        avg_loss.update(loss.item(), inputs.size(0))
+        acc.update((outputs, targets))
+        top5.update((outputs, targets))
+
+        # Backprop and step
+        loss.backward()
+        optim.step()
+
+        if idx % args.freq == 0:
+            print(f"""
+                Training {100 * idx / len(train_loader):.2f}%: Top1: {acc.compute()*100:.2f} \t Top5: {top5.compute()*100:.2f}\n
+                Loss: {avg_loss.val:.4f} ~ {avg_loss.avg:.4f} \n
+                Exe Time Per Image: {(time.time()-start_time)/((1+idx)*args.B)}s
+                """)
+    return acc.compute()*100, top5.compute()*100, avg_loss.avg
+
+
+def validate(model, val_loader, fast_gradient_method_attack, criterion):
+    model.eval()
+
+    start_time = time.time()
+    # with torch.no_grad():
+    acc = Accuracy()
+    top5 = TopKCategoricalAccuracy()
+    avg_loss = AverageMeter()
+
+    for idx, (inputs, targets) in enumerate(val_loader):
+        # Converting inputs to numpy array
+        numpy_inputs = inputs.numpy()
+        adversarial_data = fast_gradient_method_attack.generate(
+            numpy_inputs)
+
+        # Converting the adversarial data, which is currently a numpy array (I think), back to a tensor
+        inputs = torch.from_numpy(adversarial_data)
+
+        inputs = inputs.to(device)
+        targets = targets.to(device)
+        with torch.no_grad():
+            outputs = model(inputs)
+            loss = criterion(outputs, targets)
+
+        # Update Statistics
+        avg_loss.update(loss.item(), inputs.size(0))
+        acc.update((outputs, targets))
+        top5.update((outputs, targets))
+        if idx % args.freq == 0:
+            print(f"""
+            Validation {100 * idx / len(val_loader):.2f}%: Top1: {acc.compute()*100:.2f} \t Top5: {top5.compute()*100:.2f}\n
+            Loss: {avg_loss.val:.4f} ~ {avg_loss.avg:.4f} \n
+            Exe Time Per Image: {(time.time()-start_time)/((1+idx)*args.B)}s
+            """)
+    print(f"""
+            Validation Final: Top1: {acc.compute()*100:.2f} \t Top5: {top5.compute()*100:.2f}\n
+            Loss: {avg_loss.avg:.4f} \n
+            Exe Time Per Image: {(time.time()-start_time)/((1+idx)*args.B)}s
+            """)
+
+    return acc.compute()*100, top5.compute()*100, avg_loss.avg
 
 
 def save_checkpoint(metadata, filename):
@@ -173,8 +234,8 @@ if __name__ == '__main__':
     device = torch.device(dev)
     parser = argparse.ArgumentParser()
     parser.add_argument("-B", help="batch size", default=32, type=int)
-    parser.add_argument("-H", help="image height", default=64, type=int)
-    parser.add_argument("-W", help="image width", default=64, type=int)
+    parser.add_argument("-H", help="image height", default=299, type=int)
+    parser.add_argument("-W", help="image width", default=299, type=int)
     parser.add_argument("-E", help="num epochs", default=10, type=int)
     parser.add_argument("-lr", help="learning rate", default=0.001, type=float)
     parser.add_argument(
@@ -183,5 +244,9 @@ if __name__ == '__main__':
                         default="inceptionresnetv2", type=str)
     parser.add_argument(
         "-resume", help="path to target model", default='', type=str)
+    parser.add_argument(
+        "-ads", help="probability of adversarial input", default=0.5, type=float)
+    parser.add_argument(
+        "-patience", help="adaptive lr patience", default=5, type=int)
     args = parser.parse_args()
     main(args)
