@@ -10,7 +10,7 @@ class EvalDataset(Dataset):
         self.transform = transform
         self.targ = annot
 
-        self.img_dir = os.path.join(main_dir, 'images\\')
+        self.img_dir = os.path.join(main_dir, 'images')
         self.total_imgs = os.listdir(self.img_dir)
 
         if self.targ:

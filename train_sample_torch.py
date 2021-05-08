@@ -5,6 +5,7 @@ portions of the code. We provide this model in order to test the full pipeline,
 and to validate your own code submission.
 """
 
+import sys
 import argparse
 import shutil
 import pathlib
@@ -90,13 +91,17 @@ def main(args):
     optim = torch.optim.Adam(model.parameters(), lr=args.lr)
 
     criterion = nn.CrossEntropyLoss().to(device)
+    
+    fast_gradient_method_attack = None
+    
+    if args.ads > 0:
+        # Might want to mess around with what the clip_values parameter should be, I just kind of guessed
+        pytorch_classifier = PyTorchClassifier(model=model, optimizer=optim, loss=criterion, nb_classes=len(
+            CLASS_NAMES), input_shape=(3, im_height, im_width), device_type='gpu', clip_values=(0.0, 1.0))
 
-    # Might want to mess around with what the clip_values parameter should be, I just kind of guessed
-    pytorch_classifier = PyTorchClassifier(model=model, optimizer=optim, loss=criterion, nb_classes=len(
-        CLASS_NAMES), input_shape=(3, im_height, im_width), device_type='gpu', clip_values=(0.0, 1.0))
-
-    # Initialize Fast Gradient Method attack
-    fast_gradient_method_attack = FastGradientMethod(pytorch_classifier)
+        # Initialize Fast Gradient Method attack
+        fast_gradient_method_attack = FastGradientMethod(pytorch_classifier)
+    
 
     # Scheduler reduces lr after 5 epochs without loss reduction in validation
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
@@ -136,13 +141,14 @@ def train(model, train_loader, fast_gradient_method_attack, optim, criterion):
     start_time = time.time()
     for idx, (inputs, targets) in enumerate(train_loader):
 
-        # Converting inputs to numpy array
-        numpy_inputs = inputs.numpy()
-        adversarial_data = fast_gradient_method_attack.generate(
-            numpy_inputs)
+        if args.ads > 0:
+            # Converting inputs to numpy array
+            numpy_inputs = inputs.numpy()
+            adversarial_data = fast_gradient_method_attack.generate(
+                numpy_inputs)
 
-        # Converting the adversarial data, which is currently a numpy array (I think), back to a tensor
-        inputs = torch.from_numpy(adversarial_data)
+            # Converting the adversarial data, which is currently a numpy array (I think), back to a tensor
+            inputs = torch.from_numpy(adversarial_data)
 
         # Load x, y
         inputs = inputs.to(device)
@@ -161,13 +167,14 @@ def train(model, train_loader, fast_gradient_method_attack, optim, criterion):
         # Backprop and step
         loss.backward()
         optim.step()
-
+        
         if idx % args.freq == 0:
             print(f"""
                 Training {100 * idx / len(train_loader):.2f}%: Top1: {acc.compute()*100:.2f} \t Top5: {top5.compute()*100:.2f}\n
                 Loss: {avg_loss.val:.4f} ~ {avg_loss.avg:.4f} \n
                 Exe Time Per Image: {(time.time()-start_time)/((1+idx)*args.B)}s
                 """)
+            sys.stdout.flush()
     return acc.compute()*100, top5.compute()*100, avg_loss.avg
 
 
@@ -181,13 +188,15 @@ def validate(model, val_loader, fast_gradient_method_attack, criterion):
     avg_loss = AverageMeter()
 
     for idx, (inputs, targets) in enumerate(val_loader):
-        # Converting inputs to numpy array
-        numpy_inputs = inputs.numpy()
-        adversarial_data = fast_gradient_method_attack.generate(
-            numpy_inputs)
+        
+        if args.ads > 0:
+            # Converting inputs to numpy array
+            numpy_inputs = inputs.numpy()
+            adversarial_data = fast_gradient_method_attack.generate(
+                numpy_inputs)
 
-        # Converting the adversarial data, which is currently a numpy array (I think), back to a tensor
-        inputs = torch.from_numpy(adversarial_data)
+            # Converting the adversarial data, which is currently a numpy array (I think), back to a tensor
+            inputs = torch.from_numpy(adversarial_data)
 
         inputs = inputs.to(device)
         targets = targets.to(device)
@@ -205,11 +214,13 @@ def validate(model, val_loader, fast_gradient_method_attack, criterion):
             Loss: {avg_loss.val:.4f} ~ {avg_loss.avg:.4f} \n
             Exe Time Per Image: {(time.time()-start_time)/((1+idx)*args.B)}s
             """)
+            sys.stdout.flush()
     print(f"""
             Validation Final: Top1: {acc.compute()*100:.2f} \t Top5: {top5.compute()*100:.2f}\n
             Loss: {avg_loss.avg:.4f} \n
             Exe Time Per Image: {(time.time()-start_time)/((1+idx)*args.B)}s
             """)
+    sys.stdout.flush()
 
     return acc.compute()*100, top5.compute()*100, avg_loss.avg
 
@@ -233,7 +244,7 @@ if __name__ == '__main__':
         dev = "cpu"
     device = torch.device(dev)
     parser = argparse.ArgumentParser()
-    parser.add_argument("-B", help="batch size", default=32, type=int)
+    parser.add_argument("-B", help="batch size", default=256, type=int)
     parser.add_argument("-H", help="image height", default=299, type=int)
     parser.add_argument("-W", help="image width", default=299, type=int)
     parser.add_argument("-E", help="num epochs", default=10, type=int)
