@@ -51,12 +51,12 @@ def main(args):
     train_set = torchvision.datasets.ImageFolder(
         data_dir / 'train', data_transforms)
     train_loader = torch.utils.data.DataLoader(train_set, batch_size=batch_size,
-                                               shuffle=True, num_workers=4, pin_memory=True)
+                                               shuffle=True, num_workers=args.workers, pin_memory=True)
 
     val_set = EvalDataset(
         data_dir / 'val', data_transforms, sorted([item.name for item in pathlib.Path('./data/tiny-imagenet-200/train/').glob('*')]), 'val_annotations.txt')
     val_loader = torch.utils.data.DataLoader(val_set, batch_size=args.B,
-                                             shuffle=True, num_workers=4, pin_memory=True)
+                                             shuffle=True, num_workers=args.workers, pin_memory=True)
 
     # Creating a model
     model = models.__dict__[args.model](
@@ -78,6 +78,7 @@ def main(args):
         assert os.path.isfile(
             args.resume), "=> no checkpoint found at '{}'".format(args.resume)
         print("=> loading checkpoint '{}'".format(args.resume))
+        global best_loss
         checkpoint = torch.load(args.resume)
         start_epoch = checkpoint['epoch']
         best_loss = checkpoint['loss']
@@ -108,28 +109,31 @@ def main(args):
         optim, 'min', patience=args.patience)
 
     for i in range(start_epoch, num_epochs):
-        for param_group in optim.param_groups:
-            print('Epoch [{}] Learning rate: {}'.format(
-                i, param_group['lr']))
+        if args.train:
+            for param_group in optim.param_groups:
+                print('Epoch [{}] Learning rate: {}'.format(
+                    i, param_group['lr']))
+            
+            acc, top5, avg_loss = train(
+                model, train_loader, fast_gradient_method_attack, optim, criterion)
 
-        acc, top5, avg_loss = train(
-            model, train_loader, fast_gradient_method_attack, optim, criterion)
         vacc, vtop5, vloss = validate(
             model, val_loader, fast_gradient_method_attack, criterion)
 
-        save_checkpoint({
-            'epoch': i+1,
-            'net': model.state_dict(),
-            'acc': acc,
-            'top5': top5,
-            'loss': avg_loss
-        }, 'latest.pt')
+        if args.train:
+            save_checkpoint({
+                'epoch': i+1,
+                'net': model.state_dict(),
+                'acc': vacc,
+                'top5': vtop5,
+                'loss': vloss
+            }, 'latest.pt')
 
-        # Reduce learning rate after no validation loss decrease for args.patience epochs
-        scheduler.step(vloss)
+            # Reduce learning rate after no validation loss decrease for args.patience epochs
+            scheduler.step(vloss)
 
 
-best_loss = 0
+best_loss = float('inf')
 
 
 def train(model, train_loader, fast_gradient_method_attack, optim, criterion):
@@ -259,5 +263,9 @@ if __name__ == '__main__':
         "-ads", help="probability of adversarial input", default=0.5, type=float)
     parser.add_argument(
         "-patience", help="adaptive lr patience", default=5, type=int)
+    parser.add_argument("-workers", help="number of workers", default=4, type=int)
+    parser.add_argument('-notrain', dest='train', action='store_false',
+                        help='run')
+    parser.set_defaults(train=True)
     args = parser.parse_args()
     main(args)
