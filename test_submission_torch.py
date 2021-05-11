@@ -5,6 +5,7 @@ import numpy as np
 import torch
 import torchvision.transforms as transforms
 #from model import Net
+from torch import nn
 
 import pretrainedmodels as models
 
@@ -14,13 +15,16 @@ def main():
     data_dir = pathlib.Path('./data/tiny-imagenet-200/train/')
     CLASSES = sorted([item.name for item in data_dir.glob('*')])
 
+    cuda = torch.device('cuda:0')
+
     # I changed these from 64 to 299
     im_height, im_width = 299, 299
 
-    ckpt = torch.load('best.pt')
+    art_fgm_ckpt = torch.load('artfgm.pt')
     
     # Just deleting the 'pretrained' parameter is all that we would need to do, right?
     model = models.__dict__["inceptionresnetv2"](num_classes=1000)
+
 
     # Creating a final fully connected layer
     number_of_features = model.last_linear.in_features
@@ -28,10 +32,12 @@ def main():
     # Changed it to be CLASSES instead of CLASS_NAMES because the variable was named CLASSES in this file
     model.last_linear = nn.Linear(number_of_features, len(CLASSES))
 
-    model.load_state_dict(ckpt['net'])
+    model = torch.nn.DataParallel(model).to(device=cuda)
 
-    # I don't think we need the line below, do we? They didn't have it in the provided skeleton file
-    # model.to(device)
+    model.load_state_dict(art_fgm_ckpt['net'])
+
+    # Do we need the line below? They didn't have it in the provided skeleton file
+    # model.to(device=cuda)
 
     model.eval()
 
@@ -53,6 +59,10 @@ def main():
             with open(image_path, 'rb') as f:
                 img = Image.open(f).convert('RGB')
             img = data_transforms(img)[None, :]
+
+            # Using Cuda, we want to do this, right?
+            img = img.to(device=cuda)
+
             outputs = model(img)
             _, predicted = outputs.max(1)
 
