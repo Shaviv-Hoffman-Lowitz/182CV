@@ -23,9 +23,7 @@ def main():
     art_fgm_ckpt = torch.load('artfgm.pt')
     
     # Just deleting the 'pretrained' parameter is all that we would need to do, right?
-    #model = models.__dict__["inceptionresnetv2"](num_classes=1000)
-    model = models.__dict__["inceptionresnetv2"](
-        num_classes=1000)
+    model = models.__dict__["inceptionresnetv2"](num_classes=1000)
 
 
     # Creating a final fully connected layer
