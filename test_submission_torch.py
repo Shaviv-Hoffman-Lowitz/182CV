@@ -26,6 +26,7 @@ def main():
     model = models.__dict__["inceptionresnetv2"](num_classes=1000, pretrained=None)
 
 
+
     # Creating a final fully connected layer
     number_of_features = model.last_linear.in_features
 

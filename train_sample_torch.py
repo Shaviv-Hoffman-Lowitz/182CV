@@ -28,11 +28,14 @@ from art.attacks.evasion import FastGradientMethod
 
 def main(args):
     # Create a pytorch dataset
-    data_dir = pathlib.Path('./data/tiny-imagenet-200')
+    if args.ads=='c':
+        data_dir = pathlib.Path('./data/output')
+    else:
+        data_dir = pathlib.Path('./data/tiny-imagenet-200')
     image_count = len(list(data_dir.glob('**/*.JPEG')))
-    CLASS_NAMES = np.array(
-        [item.name for item in (data_dir / 'train').glob('*')])
-    CLASSES = sorted([item.name for item in pathlib.Path('./data/tiny-imagenet-200/train/').glob('*')])
+#     CLASS_NAMES = np.array(
+#         [item.name for item in (data_dir / 'train').glob('*')])
+    CLASSES = sorted([item.name for item in (data_dir / 'train').glob('*')])
     print('Discovered {} images'.format(image_count))
 
     # Create the training data generator
@@ -44,19 +47,25 @@ def main(args):
     
     train_set = None
     val_set = None
-    if args.ads=='cbar':
-        assert im_height==im_width, "Input Images must be square"
-        train_set = CBar(data_dir / 'train', im_height)
-        val_set = EvalCBar(data_dir / 'val', CLASSES, im_height, 'val_annotations.txt')
     
-    else:
-        data_transforms = transforms.Compose([
+    data_transforms = transforms.Compose([
             transforms.Resize((im_height, im_width)),
             transforms.ToTensor(),
             # these are the standard norm vectors used for imagenet
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[
                                  0.229, 0.224, 0.225]),
         ])
+    
+    if args.ads=='cbar':
+        assert im_height==im_width, "Input Images must be square"
+        train_set = CBar(data_dir / 'train', im_height)
+        val_set = EvalCBar(data_dir / 'val', CLASSES, im_height, 'val_annotations.txt')
+    elif args.ads == 'c':
+        train_set = torchvision.datasets.ImageFolder(
+            data_dir / 'train', data_transforms)
+        val_set = torchvision.datasets.ImageFolder(
+            data_dir / 'val', data_transforms)
+    else:
         train_set = torchvision.datasets.ImageFolder(
             data_dir / 'train', data_transforms)
         val_set = EvalDataset(
@@ -78,7 +87,7 @@ def main(args):
 
     # Creating a final fully connected layer that will be trained in the training loop
     number_of_features = model.last_linear.in_features
-    model.last_linear = nn.Linear(number_of_features, len(CLASS_NAMES))
+    model.last_linear = nn.Linear(number_of_features, len(CLASSES))
 
     # This should speed up training
     model = torch.nn.DataParallel(model).to(device)
@@ -108,7 +117,7 @@ def main(args):
     if args.ads == 'fgm':
         # Might want to mess around with what the clip_values parameter should be, I just kind of guessed
         pytorch_classifier = PyTorchClassifier(model=model, optimizer=optim, loss=criterion, nb_classes=len(
-            CLASS_NAMES), input_shape=(3, im_height, im_width), device_type='gpu', clip_values=(0.0, 1.0))
+            CLASSES), input_shape=(3, im_height, im_width), device_type='gpu', clip_values=(0.0, 1.0))
 
         # Initialize Fast Gradient Method attack
         fast_gradient_method_attack = FastGradientMethod(pytorch_classifier)
@@ -269,7 +278,7 @@ if __name__ == '__main__':
                         default="inceptionresnetv2", type=str)
     parser.add_argument(
         "-resume", help="path to target model", default='', type=str)
-    parser.add_argument('-ads', choices=['normal', 'fgm', 'cbar'], help="corruption to generate", default='normal')
+    parser.add_argument('-ads', choices=['normal', 'fgm', 'cbar', 'c'], help="corruption to generate", default='normal')
     parser.add_argument(
         "-patience", help="adaptive lr patience", default=5, type=int)
     parser.add_argument("-workers", help="number of workers", default=4, type=int)
