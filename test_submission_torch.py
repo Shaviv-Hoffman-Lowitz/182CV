@@ -20,27 +20,79 @@ def main():
     # I changed these from 64 to 299
     im_height, im_width = 299, 299
 
-    art_fgm_ckpt = torch.load('latest.pt')
+
+
+    art_fgm_checkpoint = torch.load('artfgm.pt')
     
     # Just deleting the 'pretrained' parameter is all that we would need to do, right?
-    model = models.__dict__["inceptionresnetv2"](num_classes=1000, pretrained=None)
-
-
+    art_fgm_model = models.__dict__["inceptionresnetv2"](num_classes=1000, pretrained=None)
 
     # Creating a final fully connected layer
-    number_of_features = model.last_linear.in_features
+    number_of_features = art_fgm_model.last_linear.in_features
 
     # Changed it to be CLASSES instead of CLASS_NAMES because the variable was named CLASSES in this file
-    model.last_linear = nn.Linear(number_of_features, len(CLASSES))
+    art_fgm_model.last_linear = nn.Linear(number_of_features, len(CLASSES))
 
-    model = torch.nn.DataParallel(model).to(device=cuda)
+    art_fgm_model = torch.nn.DataParallel(art_fgm_model).to(device=cuda)
 
-    model.load_state_dict(art_fgm_ckpt['net'])
+    art_fgm_model.load_state_dict(art_fgm_checkpoint['net'])
 
     # Do we need the line below? They didn't have it in the provided skeleton file
-    # model.to(device=cuda)
+    # art_fgm_model.to(device=cuda)
 
-    model.eval()
+    art_fgm_model.eval()
+
+
+
+
+    robustness_checkpoint = torch.load('robustness.pt')
+    
+    # Just deleting the 'pretrained' parameter is all that we would need to do, right?
+    robustness_model = models.__dict__["inceptionresnetv2"](num_classes=1000, pretrained=None)
+
+    # Creating a final fully connected layer
+    number_of_features = robustness_model.last_linear.in_features
+
+    # Changed it to be CLASSES instead of CLASS_NAMES because the variable was named CLASSES in this file
+    robustness_model.last_linear = nn.Linear(number_of_features, len(CLASSES))
+
+    robustness_model = torch.nn.DataParallel(robustness_model).to(device=cuda)
+
+    robustness_model.load_state_dict(robustness_checkpoint['net'])
+
+    # Do we need the line below? They didn't have it in the provided skeleton file
+    # robustness_model.to(device=cuda)
+
+    robustness_model.eval()
+
+
+
+
+
+    facebook_research_checkpoint = torch.load('facebook_research.pt')
+    
+    # Just deleting the 'pretrained' parameter is all that we would need to do, right?
+    facebook_research_model = models.__dict__["inceptionresnetv2"](num_classes=1000, pretrained=None)
+
+    # Creating a final fully connected layer
+    number_of_features = facebook_research_model.last_linear.in_features
+
+    # Changed it to be CLASSES instead of CLASS_NAMES because the variable was named CLASSES in this file
+    facebook_research_model.last_linear = nn.Linear(number_of_features, len(CLASSES))
+
+    facebook_research_model = torch.nn.DataParallel(facebook_research_model).to(device=cuda)
+
+    facebook_research_model.load_state_dict(facebook_research_checkpoint['net'])
+
+    # Do we need the line below? They didn't have it in the provided skeleton file
+    # robustness_model.to(device=cuda)
+
+    facebook_research_model.eval()
+
+
+
+
+
 
     data_transforms = transforms.Compose([
         transforms.Resize((im_height, im_width)),
@@ -64,7 +116,16 @@ def main():
             # Using Cuda, we want to do this, right?
             img = img.to(device=cuda)
 
-            outputs = model(img)
+            art_fgm_outputs = art_fgm_model(img)
+
+            robustness_outputs = robustness_model(img)
+
+            facebook_research_outputs = facebook_research_model(img)
+
+
+            outputs = (art_fgm_outputs + robustness_outputs + facebook_research_outputs) / 3
+
+
             _, predicted = outputs.max(1)
 
             # Write the prediction to the output file
