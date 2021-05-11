@@ -6,7 +6,7 @@ In order to run our code, please perform the following steps:
   2. ./get_data.sh (If this results in a Permission denied error, please run 'chmod +x get_data.sh' and then run './get_data.sh' again)
   3. cd ..
   4. pip install -r requirements.txt
-  5. Run python3 test_submission.py eval.csv
+  5. python3 test_submission.py eval.csv
   
 Our test_submission.py file is configured to use GPU 0.
   
