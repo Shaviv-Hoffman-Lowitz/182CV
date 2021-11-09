@@ -1,4 +1,4 @@
-Welcome to our CS 182 Computer Vision Project! We have developed a Computer Vision model that is robust against adversarial data perturbations.
+Welcome to our Deep Learning Computer Vision Project! We have developed a Computer Vision model that is robust against adversarial data perturbations.
 
 In order to run our code, please perform the following steps:
 
